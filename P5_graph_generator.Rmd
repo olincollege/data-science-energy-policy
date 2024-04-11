@@ -1,0 +1,67 @@
+---
+ title: "| Data Science With an Eye Towards Sustainability  \n| Activity P5: Data Import and Cleaning\n"
+author: "Tane Koh"
+output:
+  html_document:
+  theme:
+  bootswatch: solar
+bookdown::html_document2:
+  split_by: none
+toc: yes
+toc_float: yes
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+data <- read_csv("Net_generation_for_all_sectors_monthly.csv",show_col_types = FALSE)
+
+data$total_renewable_output <- data$`conventional hydroelectric thousand megawatthours` + data$`other renewables thousand megawatthours`
+data$Month <- as.Date(paste0("01-", data$Month), format = "%d-%b-%y")
+
+# Extract year and month
+data$year <- as.numeric(format(data$Month, "%Y"))
+data$month <- as.numeric(format(data$Month, "%m"))
+
+ggplot(data, aes(x = Month, y = total_renewable_output)) +
+  geom_line() +
+  labs(x = "Date", y = "Total Renewable Energy Output in MA (x1000 kWh)", title = "Total Renewable Energy Output vs Date")
+```
+
+```{r}
+file_names <- c("solar1.csv", "solar2.csv", "solar3.csv", "solar4.csv", "solar5.csv")
+
+# Initialize an empty dataframe
+combined_df <- data.frame()
+
+# Loop through each file and combine them
+for (file in file_names) {
+  # Read the CSV file
+  df <- read.csv(file)
+  
+  # Combine the dataframes
+  combined_df <- rbind(combined_df, df)
+}
+combined_df$date <- as.POSIXct(combined_df$LocalTime, format = "%m/%d/%y %H:%M")
+
+# Extract date without time
+combined_df$date <- as.Date(combined_df$date)
+
+# Sum up the values within each day
+aggregated_df <- combined_df %>%
+  group_by(date) %>%
+  summarise(total_value = sum(Power.MW.))
+
+ggplot(aggregated_df, aes(x = date, y = total_value)) +
+  geom_line() +
+  labs(x = "Date", y = "Total Solar Energy Output (mW)", title = "Total Renewable Energy Output vs Date")
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
