@@ -1,0 +1,153 @@
+---
+title: "P5"
+author: "Camden Droz"
+date: "2024-04-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readr)
+library(lubridate)
+library(maps)
+library(ggmap)
+library(tmap)
+library(tmaptools)
+
+register_stadiamaps("8d3c6033-7875-4644-b843-3156014c7e0a", write = TRUE)
+```
+
+```{r}
+data <- read_csv("C:/Users/cdroz/OneDrive - Olin College of Engineering/Attachments/.Spring 2024/DataScience/TTS_LBNL_public_file_27-Oct-2023_all.csv")
+```
+
+```{r}
+data_clean <- data %>% 
+  select(c("installation_date", "rebate_or_grant", "state", "city")) 
+
+```
+
+```{r}
+data_clean<-data_clean %>% 
+  filter(state == c("CT", "MA", "RI", "VT", "NH", "ME"))
+
+data_clean <- data_clean %>% 
+  mutate(
+    year = year(as.Date(data_clean$installation_date, "%d-%b-%Y"))
+  )
+
+data_clean %>% 
+  ggplot(aes(x = year))+
+  geom_bar()+
+  facet_wrap(~state)+
+  xlim(1995,2022)+
+  labs(title = "Number of Solar Installations in each New England State from 1995-2022 (Organized by State)")
+
+data_clean %>% 
+  ggplot(aes(x = state, fill = state))+
+  geom_bar()+
+  facet_wrap(~year)+
+  labs(title = "Number of Solar Installations in each New England State from 1995-2022 (Organized by Year)")
+```
+
+```{r}
+data_MA<-data_clean %>% 
+  filter(state == "MA")
+
+data_MA_2022_top30<-data_MA %>% 
+  filter(year == 2022) %>% 
+  group_by(city) %>% 
+  mutate(
+    city_count = n()
+  ) %>% 
+  arrange(desc(city_count)) %>% 
+  filter(city_count >= 10)
+
+data_MA_2022_top30$city <- paste0(data_MA_2022_top30$city,", MA")
+
+lon = c()
+lat = c()
+
+cities = unique(data_MA$city)
+cities = paste0(cities,", MA")
+cities = cities[cities %in% data_MA_2022_top30$city]
+
+for(i in  1:30){
+lon[i] = as.numeric(geocode_OSM(cities[i])$coords[1])
+lat[i] = as.numeric(geocode_OSM(cities[i])$coords[2])
+}
+
+temp = data.frame(
+  city = cities,
+  lon = lon,
+  lat = lat
+)
+
+data_MA_2022_top30 = left_join(data_MA_2022_top30,temp, by = "city")
+
+map_MA = get_stadiamap(
+  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
+  maptype = "stamen_toner_lite",
+  zoom = 9
+)
+
+ggmap(map_MA)+
+  geom_point(
+    data = data_MA_2022_top30,
+    aes(x = lon, y = lat, color = city_count),
+    alpha = .80,
+    size = 2.5
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "Number of Solar Installations in Cities with more than 10 Installs. in 2022")
+```
+
+```{r}
+data_MA_2015_top30<-data_MA %>% 
+  filter(year == 2015) %>% 
+  group_by(city) %>% 
+  mutate(
+    city_count = n()
+  ) %>% 
+  arrange(desc(city_count)) %>% 
+  filter(city_count >= 10)
+
+data_MA_2015_top30$city <- paste0(data_MA_2015_top30$city,", MA")
+
+lon = c()
+lat = c()
+
+cities = unique(data_MA$city)
+cities = paste0(cities,", MA")
+cities = cities[cities %in% data_MA_2015_top30$city]
+
+for(i in  1:133){
+lon[i] = as.numeric(geocode_OSM(cities[i])$coords[1])
+lat[i] = as.numeric(geocode_OSM(cities[i])$coords[2])
+}
+
+temp = data.frame(
+  city = cities,
+  lon = lon,
+  lat = lat
+)
+
+data_MA_2015_top30 = left_join(data_MA_2015_top30,temp, by = "city")
+
+map_MA = get_stadiamap(
+  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
+  maptype = "stamen_toner_lite",
+  zoom = 9
+)
+
+ggmap(map_MA)+
+  geom_point(
+    data = data_MA_2015_top30,
+    aes(x = lon, y = lat, color = city_count),
+    alpha = .50,
+    size = 3.5
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "Number of Solar Installations in Cities with more than 10 Installs. in 2015")
+```

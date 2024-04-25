@@ -14,6 +14,12 @@ toc_float: yes
 This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
 
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+```{r}
+library(readr)
+library(ggplot2)
+```
+
+
 
 ```{r}
 # This is a test.
@@ -66,3 +72,34 @@ Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by press
 When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
 
 The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{R}
+prices <- read_csv("MA_Residential_Installed Prices (2000-2022).csv",show_col_types = FALSE)
+tpo <- read_csv("TPO_Penetration.csv",show_col_types = FALSE)
+
+tpo$Share <- as.numeric(gsub("%", "", tpo$Share))
+
+ggplot(prices,aes(x=`Year`,y=`Median`))+
+  geom_line() +
+  labs(x="Year",y="Installation Prices ($/W)",title="Installation Prices of Solar Panels Over Time")
+
+ggplot(tpo,aes(x=`Year`,y=`Share`))+
+  geom_line() +
+  labs(x="Year",y="Market Share of Solar Energy",title="Market Penetration of Solar Energy Over Time")
+```
+
+```{r}
+camden <- read_csv("camdens big dataset.csv",show_col_types = FALSE)
+```
+
+```{r}
+camden$`Date In Service` <- as.Date(camden$`Date In Service`, format = "%m/%d/%Y")
+camden$`Total Cost with Design Fees` <- as.numeric(gsub("[^0-9.]", "", camden$`Total Cost with Design Fees`))
+camden$`Total Grant` <- as.numeric(gsub("[^0-9.]", "", camden$`Total Grant`))
+
+```
+
+```{r}
+ggplot(camden,aes(x=`Date In Service`,y=`Estimated Annual Production (kWhr)`))+
+  geom_line()
+```
