@@ -2,4 +2,4 @@
 
 Hello!
 
-![camden](docs/assets/cam.png)
+![camden](assets/cam.png)
