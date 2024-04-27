@@ -1,0 +1,318 @@
+---
+title: "P5"
+author: "Tane Koh"
+date: "2024-04-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readr)
+library(lubridate)
+library(maps)
+library(ggmap)
+library(tmap)
+library(tmaptools)
+
+register_stadiamaps("8d3c6033-7875-4644-b843-3156014c7e0a", write = TRUE)
+```
+
+```{r}
+data <- read_csv("camdens big dataset.csv")
+cities <- read_csv("MA cities.csv")
+```
+
+```{r}
+data <- data %>% 
+  rename_at('Date In Service', ~'Date') %>% 
+  rename_at('Total Cost with Design Fees', ~'Cost') %>%
+  rename_at('Total Grant', ~'Grant')
+
+data$Date <- as.Date(data$Date, format = "%m/%d/%Y")
+data$Cost <- as.numeric(gsub("[^0-9.]", "", data$Cost))
+data$Grant <- as.numeric(gsub("[^0-9.]", "", data$Grant))
+
+cities$name <- str_replace(cities$name, " town$", "")
+
+cities$name <- str_replace(cities$name, " Town$", "")
+
+data <- left_join(data,cities, by = c("City" = "name"))
+
+```
+
+```{r}
+city_counts <- data %>%
+  group_by(City) %>%
+  summarise(count = n()) %>% 
+  filter(count > 200)
+
+merged_data <- left_join(city_counts, cities, by = c("City"="name"))
+
+merged_data$ratio <- merged_data$count / merged_data$pop2024
+
+map_MA = get_stadiamap(
+  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
+  maptype = "stamen_toner_lite",
+  zoom = 9
+)
+
+ggmap(map_MA)+
+  geom_point(
+    data = merged_data,
+    aes(x = lng, y = lat),
+    alpha = .80,
+    size = merged_data$ratio*10
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "Solar Installations in MA between 2000 and 2024 per capita.",caption="Restricted to cities with over 200 installations.")
+```
+
+```{r}
+just_residential <- data %>%
+  filter(`Facility Type` == "Commercial / Office")
+
+city_counts <- data %>%
+  group_by(City) %>%
+  summarise(count = n())
+
+merged_data <- left_join(city_counts, cities, by = c("City"="name"))
+
+merged_data$ratio <- merged_data$count / merged_data$pop2024
+
+map_MA = get_stadiamap(
+  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
+  maptype = "stamen_toner_lite",
+  zoom = 9
+)
+
+ggmap(map_MA)+
+  geom_point(
+    data = merged_data,
+    aes(x = lng, y = lat),
+    alpha = .80,
+    size = merged_data$count/500
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "All Solar Installations in MA between 2000 and 2024.",caption="Not per capita.")
+```
+```{r}
+cost <- data %>% 
+  filter(Cost > 1) %>% 
+  filter(!is.na(`Capacity (DC, kW)`)) %>% 
+  filter(!is.na(`Date`)) %>% 
+  filter(!is.na(`Grant`)) %>% 
+  mutate(Cost_per_kW = `Cost` / `Capacity (DC, kW)`) %>% 
+  mutate(Grant_per_kW = `Grant` / `Capacity (DC, kW)`)
+
+average_cost_per_year <- cost %>%
+  group_by(Year = format(Date, "%Y")) %>%
+  summarise(average_Cost_per_kW = mean(Cost / `Capacity (DC, kW)`))
+
+average_capacity <- cost %>%
+  group_by(Year = format(Date, "%Y")) %>%
+  summarise(capacity = mean(`Capacity (DC, kW)`))
+
+average_cost_per_city <- cost %>% 
+  group_by(City) %>%
+  summarise(average_Cost_per_kW = mean(Cost / `Capacity (DC, kW)`))
+
+average_cost_per_city <- left_join(average_cost_per_city, cities, by = c("City"="name"))
+
+
+ggplot(average_cost_per_year,aes(x=Year,y=average_Cost_per_kW,group=1))+
+  geom_line()+
+  geom_point()+
+  labs(title="Yearly Average Cost Per KW",y="Average Cost Per kW")
+
+ggplot(average_capacity,aes(x=Year,y=capacity,group=1))+
+  geom_line()+
+  geom_point()+
+  labs(title="Yearly Average Capacity of Installation",y="Average capcity of solar panels (kW)")
+
+ggplot(cost,aes(x=Cost_per_kW))+
+  geom_density()+
+  xlim(0,10000)+
+  labs(title = "Distribution of Cost per kW",x = "Cost per kW ($)")
+
+map_MA = get_stadiamap(
+  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
+  maptype = "stamen_toner_lite",
+  zoom = 9
+)
+
+
+
+ggmap(map_MA)+
+  geom_point(
+    data = average_cost_per_city,
+    aes(x = lng, y = lat),
+    alpha = .80,
+    size = average_cost_per_city$average_Cost_per_kW/2000
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "Average Cost per kW of Solar Installations Across MA",caption="")
+```
+
+```{r}
+Grant_per <- cost %>%
+  group_by(City) %>%
+  summarise(average_grant_per_kW = mean(Grant / `Capacity (DC, kW)`))
+Grant_per <- left_join(Grant_per, cities, by = c("City"="name"))
+
+Grants <- cost %>%
+  group_by(City) %>%
+  summarise(average_grant = mean(Grant))
+
+Grants <- left_join(Grants, cities, by = c("City"="name"))
+
+ggmap(map_MA)+
+  geom_point(
+    data = Grant_per,
+    aes(x = lng, y = lat),
+    alpha = .80,
+    size = Grant_per$average_grant_per_kW/500
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "Average Grant per kW of Capacity Across MA",caption="")
+
+ggmap(map_MA)+
+  geom_point(
+    data = Grants,
+    aes(x = lng, y = lat),
+    alpha = .80,
+    size = Grants$average_grant/100000
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "Average Grant per kW of Capacity Across MA",caption="")
+
+ggplot(cost,aes(x=Grant))+
+  geom_density()+
+  xlim(0,10000)+
+  labs(title = "Distribution of Value of Grants",x = "Value of Grant ($)")
+
+ggplot(cost,aes(x=Grant_per_kW))+
+  geom_density()+
+  xlim(0,5000)+
+  labs(title = "Distribution of Value of Grants per kW",x = "Value of Grant per kW ($)")
+
+average_grant_per_kW_per_year <- cost %>%
+  group_by(Year = format(Date, "%Y")) %>%
+  summarise(average_grant_per_kW = mean(Grant / `Capacity (DC, kW)`))
+
+average_grant_year <- cost %>%
+  group_by(Year = format(Date, "%Y")) %>%
+  summarise(grant = mean(`Grant`))
+
+ggplot(average_grant_per_kW_per_year,aes(x=Year,y=average_grant_per_kW,group=1))+
+  geom_line()+
+  geom_point()+
+  labs(title="Yearly Average Grant Per kW",y="Average Grant Per kW ($)")
+
+ggplot(average_grant_year,aes(x=Year,y=grant,group=1))+
+  geom_line()+
+  geom_point()+
+  ylim(0 50000)+
+  labs(title="Yearly Average Grant",y="Average Grant ($)")
+```
+
+
+```{r}
+
+data_MA_2022_top30<-data_MA %>% 
+  filter(year == 2022) %>% 
+  group_by(city) %>% 
+  mutate(
+    city_count = n()
+  ) %>% 
+  arrange(desc(city_count)) %>% 
+  filter(city_count >= 10)
+
+data_MA_2022_top30$city <- paste0(data_MA_2022_top30$city,", MA")
+
+lon = c()
+lat = c()
+
+cities = unique(data_MA$city)
+cities = paste0(cities,", MA")
+cities = cities[cities %in% data_MA_2022_top30$city]
+
+for(i in  1:30){
+lon[i] = as.numeric(geocode_OSM(cities[i])$coords[1])
+lat[i] = as.numeric(geocode_OSM(cities[i])$coords[2])
+}
+
+temp = data.frame(
+  city = cities,
+  lon = lon,
+  lat = lat
+)
+
+data_MA_2022_top30 = left_join(data_MA_2022_top30,temp, by = "city")
+
+map_MA = get_stadiamap(
+  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
+  maptype = "stamen_toner_lite",
+  zoom = 9
+)
+
+ggmap(map_MA)+
+  geom_point(
+    data = data_MA_2022_top30,
+    aes(x = lon, y = lat, color = city_count),
+    alpha = .80,
+    size = 2.5
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "Number of Solar Installations in Cities with more than 10 Installs. in 2022")
+```
+
+```{r}
+data_MA_2015_top30<-data_MA %>% 
+  filter(year == 2015) %>% 
+  group_by(city) %>% 
+  mutate(
+    city_count = n()
+  ) %>% 
+  arrange(desc(city_count)) %>% 
+  filter(city_count >= 10)
+
+data_MA_2015_top30$city <- paste0(data_MA_2015_top30$city,", MA")
+
+lon = c()
+lat = c()
+
+cities = unique(data_MA$city)
+cities = paste0(cities,", MA")
+cities = cities[cities %in% data_MA_2015_top30$city]
+
+for(i in  1:133){
+lon[i] = as.numeric(geocode_OSM(cities[i])$coords[1])
+lat[i] = as.numeric(geocode_OSM(cities[i])$coords[2])
+}
+
+temp = data.frame(
+  city = cities,
+  lon = lon,
+  lat = lat
+)
+
+data_MA_2015_top30 = left_join(data_MA_2015_top30,temp, by = "city")
+
+map_MA = get_stadiamap(
+  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
+  maptype = "stamen_toner_lite",
+  zoom = 9
+)
+
+ggmap(map_MA)+
+  geom_point(
+    data = data_MA_2015_top30,
+    aes(x = lon, y = lat, color = city_count),
+    alpha = .50,
+    size = 3.5
+  )+
+  scale_color_gradient(low = "yellow", high = "red")+
+  labs(title = "Number of Solar Installations in Cities with more than 10 Installs. in 2015")
+```
+
