@@ -94,20 +94,26 @@ ggmap(map_MA)+
     size = merged_data$count/500
   )+
   scale_color_gradient(low = "yellow", high = "red")+
-  labs(title = "All Solar Installations in MA between 2000 and 2024.",caption="Not per capita.")
+  labs(title = "All Solar Installations in MA between 2000 and 2016.",caption="Not per capita.")
 ```
 ```{r}
 cost <- data %>% 
+  filter(`Facility Type` %in% c("Multi-family residential (4 or more dwelling units per building)", "Residential (3 or fewer dwelling units per building)")) %>% 
   filter(Cost > 1) %>% 
   filter(!is.na(`Capacity (DC, kW)`)) %>% 
   filter(!is.na(`Date`)) %>% 
   filter(!is.na(`Grant`)) %>% 
+  filter(!is.na(`Cost`)) %>%
   mutate(Cost_per_kW = `Cost` / `Capacity (DC, kW)`) %>% 
   mutate(Grant_per_kW = `Grant` / `Capacity (DC, kW)`)
 
 average_cost_per_year <- cost %>%
   group_by(Year = format(Date, "%Y")) %>%
   summarise(average_Cost_per_kW = mean(Cost / `Capacity (DC, kW)`))
+
+average_cost_per_year2 <- cost %>%
+  group_by(Year = format(Date, "%Y")) %>%
+  summarise(mean_cost = mean(Cost / `Estimated Annual Production (kWhr)`))
 
 average_capacity <- cost %>%
   group_by(Year = format(Date, "%Y")) %>%
@@ -119,6 +125,10 @@ average_cost_per_city <- cost %>%
 
 average_cost_per_city <- left_join(average_cost_per_city, cities, by = c("City"="name"))
 
+ggplot(average_cost_per_year2,aes(x=Year,y=mean_cost,group=1))+
+  geom_line()+
+  geom_point()+
+  labs(title="Yearly Average Cost Per kWhr of Annual Energy Production",y="Average Cost Per kWhr of Annual Energy Production")
 
 ggplot(average_cost_per_year,aes(x=Year,y=average_Cost_per_kW,group=1))+
   geom_line()+
@@ -128,7 +138,7 @@ ggplot(average_cost_per_year,aes(x=Year,y=average_Cost_per_kW,group=1))+
 ggplot(average_capacity,aes(x=Year,y=capacity,group=1))+
   geom_line()+
   geom_point()+
-  labs(title="Yearly Average Capacity of Installation",y="Average capcity of solar panels (kW)")
+  labs(title="Trends in Residential Solar Installations Over TIme",y="Average capcity of solar panels (kW)")
 
 ggplot(cost,aes(x=Cost_per_kW))+
   geom_density()+
@@ -204,6 +214,16 @@ average_grant_year <- cost %>%
   group_by(Year = format(Date, "%Y")) %>%
   summarise(grant = mean(`Grant`))
 
+total_grant_year <- cost %>%
+  group_by(Year = format(Date, "%Y")) %>%
+  summarise(grant = sum(`Grant`))
+
+total_grant_city <- cost %>%
+  filter(`Facility Type` == "Residential (3 or fewer dwelling units per building)") %>% 
+  group_by(City) %>%
+  summarise(grant = sum(`Grant`))
+total_grant_city <- left_join(total_grant_city, cities, by = c("City"="name"))
+
 ggplot(average_grant_per_kW_per_year,aes(x=Year,y=average_grant_per_kW,group=1))+
   geom_line()+
   geom_point()+
@@ -212,107 +232,179 @@ ggplot(average_grant_per_kW_per_year,aes(x=Year,y=average_grant_per_kW,group=1))
 ggplot(average_grant_year,aes(x=Year,y=grant,group=1))+
   geom_line()+
   geom_point()+
-  ylim(0 50000)+
+  ylim(0,75000)+
   labs(title="Yearly Average Grant",y="Average Grant ($)")
-```
 
-
-```{r}
-
-data_MA_2022_top30<-data_MA %>% 
-  filter(year == 2022) %>% 
-  group_by(city) %>% 
-  mutate(
-    city_count = n()
-  ) %>% 
-  arrange(desc(city_count)) %>% 
-  filter(city_count >= 10)
-
-data_MA_2022_top30$city <- paste0(data_MA_2022_top30$city,", MA")
-
-lon = c()
-lat = c()
-
-cities = unique(data_MA$city)
-cities = paste0(cities,", MA")
-cities = cities[cities %in% data_MA_2022_top30$city]
-
-for(i in  1:30){
-lon[i] = as.numeric(geocode_OSM(cities[i])$coords[1])
-lat[i] = as.numeric(geocode_OSM(cities[i])$coords[2])
-}
-
-temp = data.frame(
-  city = cities,
-  lon = lon,
-  lat = lat
-)
-
-data_MA_2022_top30 = left_join(data_MA_2022_top30,temp, by = "city")
-
-map_MA = get_stadiamap(
-  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
-  maptype = "stamen_toner_lite",
-  zoom = 9
-)
+ggplot(total_grant_year,aes(x=Year,y=grant/1000000,group=1))+
+  geom_line()+
+  geom_point()+
+  ylim(0,40)+
+  labs(title="Total Grants Awarded By Year",y="Total Value of Grants Awarded ($M)")
 
 ggmap(map_MA)+
   geom_point(
-    data = data_MA_2022_top30,
-    aes(x = lon, y = lat, color = city_count),
+    data = total_grant_city,
+    aes(x = lng, y = lat),
     alpha = .80,
-    size = 2.5
+    size = total_grant_city$grant/(100*total_grant_city$pop2024)
   )+
   scale_color_gradient(low = "yellow", high = "red")+
-  labs(title = "Number of Solar Installations in Cities with more than 10 Installs. in 2022")
+  labs(title = "Total Residential Grants Awarded by City per capita",caption="")
+```
+```{r}
+lm_model <- lm(Grant ~ `Estimated Annual Production (kWhr)`, data = data)
+
+# Create a scatter plot with regression line
+ggplot(data, aes(y = Grant, x = `Estimated Annual Production (kWhr)`)) +
+  geom_point() +  # Add points
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Add linear regression line
+  xlim(0,750000)+
+  labs(x = "Estimated Annual Production (kWhr)", y = "Grant", title = "Linear Model: Estimated Annual Production vs. Grant") +
+  theme_minimal()
+
+lm_model2 <- lm(`Grant` ~ pop2024, data = data)
+
+# Create a scatter plot with regression line
+ggplot(cost, aes(x = pop2024, y = `Grant`)) +
+  geom_point() +  # Add points
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Add linear regression line
+  ylim(0,750000)+
+  labs(x = "Population", y = "Grant", title = "Linear Model: Estimated Annual Production vs. Grant") +
+  theme_minimal()
+
+lm_model3 <- lm(`Grant` ~ pop2024 + `Estimated Annual Production (kWhr)`, data = cost)
+
+intercept <- coef(lm_model3)[1]
+slope_production <- coef(lm_model3)[2]
+slope_pop2024 <- coef(lm_model3)[3]
+
+# Create the scatter plot with the linear regression line
+ggplot(cost, aes(x = `Estimated Annual Production (kWhr)`, y = Grant)) +
+  geom_point() +  # Add points
+  geom_smooth(method = "lm", se = FALSE, color = "blue", formula = y ~ x + pop2024) +  # Add linear regression line
+  labs(x = "Estimated Annual Production", y = "Grant", title = "Linear Model: Grant ~ Estimated Annual Production + pop2024") +
+  theme_minimal() +
+  xlim(0,700000)+
+  annotate("text", x = max(data$`Estimated Annual Production (kWhr)`), y = max(data$Grant), 
+           label = paste("Grant =", round(intercept, 2), "+", round(slope_production, 2), "* Production +", round(slope_pop2024, 2), "* pop2024"))
 ```
 
 ```{r}
-data_MA_2015_top30<-data_MA %>% 
-  filter(year == 2015) %>% 
-  group_by(city) %>% 
-  mutate(
-    city_count = n()
-  ) %>% 
-  arrange(desc(city_count)) %>% 
-  filter(city_count >= 10)
+# make visualization of newer implementations via color
+City_color <- cost %>%
+  mutate(Year = lubridate::year(Date)) %>% 
+  group_by(City) %>%
+  summarise(avg_year = mean(Year))
+City_color <- left_join(City_color, cities, by = c("City"="name"))
 
-data_MA_2015_top30$city <- paste0(data_MA_2015_top30$city,", MA")
-
-lon = c()
-lat = c()
-
-cities = unique(data_MA$city)
-cities = paste0(cities,", MA")
-cities = cities[cities %in% data_MA_2015_top30$city]
-
-for(i in  1:133){
-lon[i] = as.numeric(geocode_OSM(cities[i])$coords[1])
-lat[i] = as.numeric(geocode_OSM(cities[i])$coords[2])
-}
-
-temp = data.frame(
-  city = cities,
-  lon = lon,
-  lat = lat
-)
-
-data_MA_2015_top30 = left_join(data_MA_2015_top30,temp, by = "city")
-
-map_MA = get_stadiamap(
-  bbox = c(left = -73.1387, bottom = 41.4696, right = -69.8813, top = 42.8599),
-  maptype = "stamen_toner_lite",
-  zoom = 9
-)
-
-ggmap(map_MA)+
+ggmap(map_MA) +
   geom_point(
-    data = data_MA_2015_top30,
-    aes(x = lon, y = lat, color = city_count),
-    alpha = .50,
-    size = 3.5
-  )+
-  scale_color_gradient(low = "yellow", high = "red")+
-  labs(title = "Number of Solar Installations in Cities with more than 10 Installs. in 2015")
+    data = City_color,
+    aes(x = lng, y = lat, color = avg_year),
+    alpha = 0.80,
+    size = 3
+  ) +
+  scale_color_gradient(
+    low = "white",
+    high = "blue",
+    limits = range(City_color$avg_year),
+    breaks = pretty(range(City_color$avg_year), n = 5)
+  ) +
+  labs(
+    title = "Average Year of Solar Project Installation",
+    caption = ""
+  ) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_colorbar(title = "Average Year"))
+
+# visualization of price rate change specific to commercial/residential facet plot?
+cost2 <- cost %>%
+  mutate(`Facility Type` = case_when(
+    `Facility Type` %in% c("Multi-family residential (4 or more dwelling units per building)", 
+                         "Residential (3 or fewer dwelling units per building)") ~ "Residential",
+    `Facility Type` %in% c("Industrial", "Commercial / Office", "Restaurant / Food Service", "Retail") ~ "Industrial",
+    `Facility Type` %in% c("College / University", "Community Solar", "Federal", 
+                         "Hospital / Health Care", "Municipal - K-12 School", 
+                         "Municipal / Government / Public", "School (K-12)", "State", 
+                         "State - College/University") ~ "Government",
+    `Facility Type` %in% c("Other", "Agricultural", "Religious", "Mixed use (commercial & residential)") ~ "Other"
+  ))
+
+facet_data <- cost2 %>%
+  mutate(Year = lubridate::year(Date)) %>% 
+  group_by(`Facility Type`, Year) %>%
+  summarise(average_cost = mean(Cost / `Estimated Annual Production (kWhr)`))
+
+ggplot(facet_data, aes(x = Year, y = average_cost, color = `Facility Type`)) +
+  geom_line() +
+  labs(x = "Year", y = "Average Cost per Annual Production", title = "Cost per Annual Production by Facility Type") +
+  theme_minimal()+
+  ylim(0,12)
+
+facet_grant <- cost2 %>%
+  mutate(Year = lubridate::year(Date)) %>% 
+  group_by(`Facility Type`, Year) %>%
+  summarise(avg_grant = mean(Grant / `Estimated Annual Production (kWhr)`))
+
+ggplot(facet_grant, aes(x = Year, y = avg_grant, color = `Facility Type`)) +
+  geom_line() +
+  labs(x = "Year", y = "Average Grant per Annual Production", title = "Grant per Annual Production by Facility Type") +
+  theme_minimal()+
+  ylim(0,7)
+
+## Grants awarded by city per capita but limited to residential
 ```
+
+```{r}
+cost$Year <- format(cost$Date, "%Y")
+
+# Aggregate data by year to calculate average Capacity and Production
+aggregate_cost <- cost %>%
+  group_by(Year) %>%
+  summarise(avg_capacity = mean(`Capacity (DC, kW)`),
+            avg_production = mean(`Estimated Annual Production (kWhr)`))
+
+ggplot(aggregate_cost, aes(x = Year)) +
+  geom_line(aes(y = avg_capacity*1000, color = "Capacity"), group = 1) +
+  geom_line(aes(y = avg_production, color = "Production"), group = 1) +
+  labs(title = "Capacity and Production of Residential Solar Installations Over Time",
+       x = "Date",
+       y = "Average Estimated Annual Production (kWhr)",
+       color = "Variable") +
+  scale_color_manual(values = c("Capacity" = "blue", "Production" = "red")) +
+  theme_minimal() +
+  # Adding a secondary y-axis for Production
+  scale_y_continuous(
+    sec.axis = sec_axis(~./1000, name = "Average Capacity (kW)")
+  )
+```
+```{r}
+
+aggr_money <- cost %>%
+  group_by(Year) %>%
+  summarise(cost = mean(Cost/`Estimated Annual Production (kWhr)`),
+            grant = mean(Grant/`Estimated Annual Production (kWhr)`))
+
+ggplot(aggr_money, aes(x = Year)) +
+  geom_line(aes(y = cost, color = "Average Cost of Installation"), group = 1) +
+  geom_line(aes(y = grant*2, color = "Average Awarded Grant Value"), group = 1) +
+  labs(title = "Cost of Residential Solar Installations and Grant Values per kWhr over time",
+       x = "Date",
+       y = "Cost ($/kWhr)",
+       color = "Variable") +
+  scale_color_manual(values = c("Average Cost of Installation" = "blue", "Average Awarded Grant Value" = "red")) +
+  # Adding a secondary y-axis for Production
+  scale_y_continuous(
+    sec.axis = sec_axis(~./2, name = "Grant ($/kWhr)")
+  )
+
+```
+```{r}
+# average per year amount grant vs number of grants
+grant_per <- cost %>% 
+  
+
+```
+
+# number per funding type faceted by year
 
