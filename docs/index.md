@@ -30,7 +30,7 @@ It is often difficult to analyze the impacts of any intervention (policy, financ
 
 [^1]: Treasury Board of Canada Secretariat. “Theory-Based Approaches to Evaluation: Concepts and Practices.” Canada.Ca, 22 Mar. 2021, www.canada.ca/en/treasury-board-secretariat/services/audit-evaluation/evaluation-government-canada/theory-based-approaches-evaluation-concepts-practices.html.
 
-![](assets/theories-of-change-and-logic-models.jpg){fig-align="center"}
+![](assets/theories-of-change-and-logic-models.jpg){style="fig-align: center;"}
 
 For the purposes of our research question, we may ask: “How can the effect of Massachusetts State-funded Grants and Loans be seen in the trends of Residential Solar Photovoltaic panel installations since 2000?”; this framework provides a guideline for evaluation of the effectiveness of the listed grants/loans in increasing the accessibility of Solar PV panels at the residential level.
 
