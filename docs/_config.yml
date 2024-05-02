@@ -1,7 +1,6 @@
 # Where things are
 source              : .
 destination         : ./_site
-theme: jekyll-theme-minima
 collections_dir     : .
 plugins_dir         : _plugins # takes an array of strings and loads plugins in that order
 layouts_dir         : _layouts
