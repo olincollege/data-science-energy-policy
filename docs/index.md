@@ -48,37 +48,28 @@ The use of government grants as financial incentives for residential solar proje
 ## ANALYSIS
 
 ### *Cost v. Time*
-
 ![](assets/01-cost-over-time.png)
 
 ### *Average Grant Per kW v. Time*
-
 ![](assets/02-grant-per-kWh.png)
 
 ### *Estimated Capacity & Production by Year*
-
 ![](assets/03-est-capacity-vs-production.png)
 
 ### *Total Grants by City*
-
 ![](assets/04-grants-by-city-choro.png)
 
 ### *Number of Grants per Funding Type by Year*
-
 ![](assets/05-grants-types.png)
 
 ### *Average Grant Value v. Cost of Installation*
-
 ![](assets/06-grant-value-vs-cost.png)
 
 ### *Average Grant Amount v. Grants by Year*
-
 ![](assets/07-grant-amount-vs-grants-by-year.png)
 
 ### *Grants Awarded v. Average Income Per Capita*
-
 ![](assets/08a-grants-awarded-v-avg-income.png)
-
 ![](assets/08b-grants-awarded-v-avg-income.png)
 
 ## CONCLUSIONS
